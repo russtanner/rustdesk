@@ -147,6 +147,39 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Embed T4 RustDesk server configuration
+        if: ${{ matrix.job.arch == 'x86_64' }}
+        shell: pwsh
+        env:
+          CUSTOM_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          CUSTOM_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          $server = $env:CUSTOM_SERVER.Trim()
+          $key = $env:CUSTOM_KEY.Trim()
+
+          if ($server -ne 'rustdesk.rtnetworks.us' -or !$key) {
+            throw "Check RENDEZVOUS_SERVER and RS_PUB_KEY secrets"
+          }
+
+          $path = "libs/hbb_common/src/config.rs"
+          $src = Get-Content $path -Raw
+
+          $oldServer = 'pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];'
+          $oldKey = 'pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";'
+          $oldSettings = 'pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = Default::default();'
+
+          foreach ($needle in @($oldServer, $oldKey, $oldSettings)) {
+            if (!$src.Contains($needle)) {
+              throw "Expected RustDesk source code was not found"
+            }
+          }
+
+          $src = $src.Replace($oldServer, ('pub const RENDEZVOUS_SERVERS: &[&str] = &["' + $server + '"];'))
+          $src = $src.Replace($oldKey, ('pub const RS_PUB_KEY: &str = "' + $key + '";'))
+          $src = $src.Replace($oldSettings, ('pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("custom-rendezvous-server".to_string(), "' + $server + '".to_string()), ("key".to_string(), "' + $key + '".to_string())]));'))
+
+          Set-Content -Path $path -Value $src -NoNewline -Encoding utf8
+
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
