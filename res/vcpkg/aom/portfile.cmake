@@ -1,4 +1,16 @@
-# NASM is required to build AOM
+# NASM is required to build AOM.
+# Prefer NASM 2.16.03 installed by our GitHub Actions workflow.
+
+if(DEFINED ENV{RUNNER_TEMP})
+    file(TO_CMAKE_PATH "$ENV{RUNNER_TEMP}" RUSTDESK_RUNNER_TEMP)
+    set(RUSTDESK_NASM "${RUSTDESK_RUNNER_TEMP}/nasm/nasm-2.16.03/nasm.exe")
+
+    if(EXISTS "${RUSTDESK_NASM}")
+        set(NASM "${RUSTDESK_NASM}")
+        message(STATUS "Using RustDesk NASM: ${NASM}")
+    endif()
+endif()
+
 vcpkg_find_acquire_program(NASM)
 get_filename_component(NASM_EXE_PATH ${NASM} DIRECTORY)
 vcpkg_add_to_path(${NASM_EXE_PATH})
