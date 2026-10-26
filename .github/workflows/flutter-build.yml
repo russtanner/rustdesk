@@ -122,6 +122,24 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
+      - name: Install NASM 2.16.03
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'nasm.zip'
+          $destination = Join-Path $env:RUNNER_TEMP 'nasm'
+
+          Invoke-WebRequest `
+            -Uri 'https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip' `
+            -OutFile $zip
+
+          Expand-Archive -Path $zip -DestinationPath $destination
+
+          $nasmDir = Join-Path $destination 'nasm-2.16.03'
+
+          & (Join-Path $nasmDir 'nasm.exe') -v
+
+          Add-Content -Path $env:GITHUB_PATH -Value $nasmDir
+
       - name: Install vcpkg dependencies
         env:
           VCPKG_DEFAULT_HOST_TRIPLET: ${{ matrix.job.vcpkg-triplet }}
