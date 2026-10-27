@@ -824,6 +824,48 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Embed T4 RustDesk server configuration (macOS)
+        shell: bash
+        env:
+          CUSTOM_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          CUSTOM_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          server = os.environ["CUSTOM_SERVER"].strip()
+          key = os.environ["CUSTOM_KEY"].strip()
+
+          if server != "rustdesk.rtnetworks.us" or not key:
+              raise SystemExit("Check RENDEZVOUS_SERVER and RS_PUB_KEY secrets")
+
+          path = Path("libs/hbb_common/src/config.rs")
+          source = path.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  'pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];',
+                  f'pub const RENDEZVOUS_SERVERS: &[&str] = &["{server}"];'
+              ),
+              (
+                  'pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";',
+                  f'pub const RS_PUB_KEY: &str = "{key}";'
+              ),
+              (
+                  'pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = Default::default();',
+                  f'pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("custom-rendezvous-server".to_string(), "{server}".to_string()), ("key".to_string(), "{key}".to_string())]));'
+              )
+          ]
+
+          for original, replacement in replacements:
+              if original not in source:
+                  raise SystemExit("Expected RustDesk 1.5.0 configuration was not found")
+              source = source.replace(original, replacement)
+
+          path.write_text(source, encoding="utf-8")
+          PY
+
       - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != null
         uses: apple-actions/import-codesign-certs@253ddeeac23f2bdad1646faac5c8c2832e800071 # v1
